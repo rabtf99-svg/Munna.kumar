@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Munna Kumar Location Finder</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--blue:#1267d6;--dark:#16365d;--bg:#f3f7fc;--green:#087f5b}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:#17324f}
+header{background:linear-gradient(120deg,#145bb2,#267bd7);color:white;padding:20px 5%;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{font-size:35px;background:#ffffff24;border-radius:15px;padding:8px}h1{font-size:clamp(22px,3vw,32px);margin:0}header p{margin:6px 0 0;color:#e4efff}
+main{max-width:1200px;margin:24px auto;padding:0 16px}.layout{display:grid;grid-template-columns:330px 1fr;gap:18px}
+.panel,.details{background:white;border:1px solid #d8e5f5;border-radius:14px;padding:22px;box-shadow:0 5px 18px #17324f0a}
+h2{font-size:21px;margin:0 0 12px;color:var(--dark)}.hint{color:#637892;font-size:14px;line-height:1.5}
+label{display:block;font-weight:700;margin:16px 0 7px}input{width:100%;padding:13px;border:1px solid #cbd9eb;border-radius:8px;font-size:16px;outline-color:var(--blue)}
+button{width:100%;padding:13px;border:0;border-radius:8px;font-weight:700;font-size:15px;cursor:pointer;margin-top:13px}
+.primary{background:var(--blue);color:white}.secondary{background:#fff;border:1px solid #9bbce9;color:var(--blue)}.green{background:var(--green);color:white}
+#map{height:520px;min-height:360px;border-radius:14px;border:1px solid #d8e5f5;z-index:1}
+.details{margin-top:18px}.detailgrid{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}.value{line-height:1.7;overflow-wrap:anywhere}.muted{color:#647993}.actions{max-width:260px}
+.status{font-size:14px;line-height:1.5;margin-top:12px;color:#526982;min-height:20px}
+footer{text-align:center;padding:22px;color:#647993;font-size:13px}
+@media(max-width:760px){.layout{grid-template-columns:1fr}#map{height:390px}.detailgrid{grid-template-columns:1fr}.actions{max-width:none}header{padding:18px 16px}}
+</style>
+</head>
+<body>
+<header><div class="logo">📍</div><div><h1>Munna Kumar Location Finder</h1><p>Latitude aur Longitude daalein, location map par dekhein</p></div></header>
+<main>
+<div class="layout">
+<section class="panel">
+<h2>📌 Coordinates daalein</h2>
+<p class="hint">Latitude -90 se 90 aur Longitude -180 se 180 ke beech hona chahiye.</p>
+<label for="lat">Latitude</label><input id="lat" type="number" step="any" placeholder="Jaise 25.8629" value="28.6139">
+<label for="lon">Longitude</label><input id="lon" type="number" step="any" placeholder="Jaise 85.7810" value="77.2090">
+<button class="primary" id="find">📍 Find Location</button>
+<button class="secondary" id="clear">Clear</button>
+<button class="secondary" id="mypos">◎ Use my current location</button>
+<div class="status" id="status" aria-live="polite">Example coordinates map par dikh rahe hain.</div>
+</section>
+<div id="map" aria-label="Location map"></div>
+</div>
+<section class="details">
+<h2>📍 Location Details</h2>
+<div class="detailgrid">
+<div class="value">
+<div><b>Latitude:</b> <span id="outlat">28.6139</span></div>
+<div><b>Longitude:</b> <span id="outlon">77.2090</span></div>
+<div style="margin-top:8px"><b>Address:</b><br><span id="address" class="muted">Address load ho raha hai…</span></div>
+</div>
+<div class="actions"><button class="green" id="google">↗ Open in Google Maps</button><button class="secondary" id="copy">Copy Coordinates</button></div>
+</div>
+</section>
+</main>
+<footer>Munna Kumar Location Finder · Map data © OpenStreetMap contributors</footer>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const map=L.map('map').setView([28.6139,77.2090],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+let marker=L.marker([28.6139,77.2090]).addTo(map);
+let current={lat:28.6139,lon:77.2090};
+function setStatus(s){$('status').textContent=s}
+async function lookup(lat,lon){
+ current={lat,lon}; $('outlat').textContent=lat.toFixed(6); $('outlon').textContent=lon.toFixed(6);
+ marker.setLatLng([lat,lon]).bindPopup(`${lat.toFixed(6)}, ${lon.toFixed(6)}`).openPopup();
+ map.setView([lat,lon],15); $('address').textContent='Address dhoonda ja raha hai…';
+ setStatus('Location map par dikhayi gayi. Address load ho raha hai…');
+ try{
+  const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+  if(!r.ok) throw new Error('Address service unavailable');
+  const d=await r.json(); $('address').textContent=d.display_name||'Is point ka address nahi mila.';
+  setStatus('Location mil gayi.');
+ }catch(e){$('address').textContent='Address abhi nahi mil saka. Coordinates aur map marker sahi hain.';setStatus('Map updated. Address ke liye internet connection zaroori hai.');}
+}
+$('find').addEventListener('click',()=>{
+ const lat=Number($('lat').value),lon=Number($('lon').value);
+ if($('lat').value.trim()===''||$('lon').value.trim()===''||!Number.isFinite(lat)||!Number.isFinite(lon)||lat < -90||lat > 90||lon < -180||lon > 180){setStatus('Sahi coordinates daalein: Latitude -90 se 90, Longitude -180 se 180.');return;}
+ lookup(lat,lon);
+});
+$('clear').addEventListener('click',()=>{$('lat').value='';$('lon').value='';$('address').textContent='Coordinates daal kar Find Location dabayein.';setStatus('Fields clear kar diye gaye.');});
+$('google').addEventListener('click',()=>window.open(`https://www.google.com/maps?q=${current.lat},${current.lon}`,'_blank','noopener'));
+$('copy').addEventListener('click',async()=>{const s=`Latitude: ${current.lat}\nLongitude: ${current.lon}`;try{await navigator.clipboard.writeText(s);setStatus('Coordinates copy ho gaye.')}catch(e){setStatus(s)}});
+$('mypos').addEventListener('click',()=>{if(!navigator.geolocation){setStatus('Is browser mein location feature available nahi hai.');return;}setStatus('Aapki permission ka intezar hai…');navigator.geolocation.getCurrentPosition(p=>{const lat=p.coords.latitude,lon=p.coords.longitude;$('lat').value=lat;$('lon').value=lon;lookup(lat,lon)},e=>setStatus('Current location nahi mil saki. Browser permission dein aur HTTPS par website kholein.'),{enableHighAccuracy:true,timeout:12000});});
+lookup(28.6139,77.2090);
+</script>
+</body></html>
